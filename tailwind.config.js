@@ -1,0 +1,140 @@
+/** @type {import('tailwindcss').Config} */
+
+export default {
+  darkMode: "class",
+  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
+  theme: {
+    container: {
+      center: true,
+    },
+    extend: {
+      // 自定义颜色方案
+      colors: {
+        primary: {
+          50: "#eef5f8",
+          100: "#d6e7ee",
+          200: "#b0cfdb",
+          300: "#7fb0c2",
+          400: "#4d8aa3",
+          500: "#2d6f89",
+          600: "#22596f",
+          700: "#1d495b",
+          800: "#1a3a4a",
+          900: "#122a35",
+          950: "#0a1a21",
+          DEFAULT: "#1a3a4a",
+        },
+        accent: {
+          50: "#fff4ef",
+          100: "#ffe6d9",
+          200: "#ffc9b3",
+          300: "#ffa482",
+          400: "#ff7a45",
+          500: "#f95a1f",
+          600: "#ea4312",
+          700: "#c33411",
+          800: "#9b2b16",
+          900: "#7d2716",
+          950: "#440f08",
+          DEFAULT: "#ff7a45",
+        },
+        cream: {
+          50: "#fcfbf9",
+          100: "#f9f7f4",
+          200: "#f5f3ef",
+          300: "#ece8e0",
+          400: "#dcd5c8",
+          500: "#c9bfac",
+          600: "#b5a78e",
+          700: "#998a72",
+          800: "#7d705f",
+          900: "#665c50",
+          950: "#362f28",
+          DEFAULT: "#f5f3ef",
+        },
+        success: {
+          50: "#ecfdf5",
+          100: "#d1fae5",
+          200: "#a7f3d0",
+          300: "#6ee7b7",
+          400: "#34d399",
+          500: "#10b981",
+          600: "#059669",
+          700: "#047857",
+          800: "#065f46",
+          900: "#064e3b",
+          950: "#022c22",
+          DEFAULT: "#10b981",
+        },
+        warning: {
+          50: "#fffbeb",
+          100: "#fef3c7",
+          200: "#fde68a",
+          300: "#fcd34d",
+          400: "#fbbf24",
+          500: "#f59e0b",
+          600: "#d97706",
+          700: "#b45309",
+          800: "#92400e",
+          900: "#78350f",
+          950: "#451a03",
+          DEFAULT: "#f59e0b",
+        },
+        danger: {
+          50: "#fef2f2",
+          100: "#fee2e2",
+          200: "#fecaca",
+          300: "#fca5a5",
+          400: "#f87171",
+          500: "#ef4444",
+          600: "#dc2626",
+          700: "#b91c1c",
+          800: "#991b1b",
+          900: "#7f1d1d",
+          950: "#450a0a",
+          DEFAULT: "#ef4444",
+        },
+      },
+      // 自定义字体
+      fontFamily: {
+        serif: ["Lora", "Georgia", "serif"],
+        sans: [
+          "Noto Sans SC",
+          "PingFang SC",
+          "Hiragino Sans GB",
+          "Microsoft YaHei",
+          "Inter",
+          "sans-serif",
+        ],
+      },
+      // 自定义动画
+      animation: {
+        "fade-in-up": "fadeInUp 0.5s ease-out forwards",
+        "scale-in": "scaleIn 0.3s ease-out forwards",
+      },
+      keyframes: {
+        fadeInUp: {
+          "0%": {
+            opacity: "0",
+            transform: "translateY(20px)",
+          },
+          "100%": {
+            opacity: "1",
+            transform: "translateY(0)",
+          },
+        },
+        scaleIn: {
+          "0%": {
+            opacity: "0",
+            transform: "scale(0.95)",
+          },
+          "100%": {
+            opacity: "1",
+            transform: "scale(1)",
+          },
+        },
+      },
+    },
+  },
+  plugins: [],
+};
