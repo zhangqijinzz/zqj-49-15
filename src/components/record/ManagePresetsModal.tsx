@@ -11,7 +11,7 @@ export interface ManagePresetsModalProps {
   presets: FilterPreset[];
   activePresetId: string | null;
   onEdit: (preset: FilterPreset) => void;
-  onDelete: (id: string) => void;
+  onDelete: (ids: string[]) => void;
   onReorder: (orderedIds: string[]) => void;
   onApply: (id: string) => void;
 }
@@ -28,13 +28,18 @@ export const ManagePresetsModal: React.FC<ManagePresetsModalProps> = ({
 }) => {
   const [localPresets, setLocalPresets] = React.useState<FilterPreset[]>([]);
   const [deleteConfirmId, setDeleteConfirmId] = React.useState<string | null>(null);
+  const wasOpenRef = React.useRef(false);
+  const presetsRef = React.useRef<FilterPreset[]>([]);
+
+  presetsRef.current = presets;
 
   React.useEffect(() => {
-    if (open) {
-      setLocalPresets([...presets].sort((a, b) => a.order - b.order));
+    if (open && !wasOpenRef.current) {
+      setLocalPresets([...presetsRef.current].sort((a, b) => a.order - b.order));
       setDeleteConfirmId(null);
     }
-  }, [open, presets]);
+    wasOpenRef.current = open;
+  }, [open]);
 
   const moveItem = (index: number, direction: 'up' | 'down') => {
     const newList = [...localPresets];
@@ -45,14 +50,23 @@ export const ManagePresetsModal: React.FC<ManagePresetsModalProps> = ({
     setLocalPresets(newList);
   };
 
-  const handleClose = () => {
-    const orderedIds = localPresets.map((p) => p.id);
-    const originalOrder = [...presets].sort((a, b) => a.order - b.order).map((p) => p.id);
-    const orderChanged = orderedIds.length !== originalOrder.length ||
-      orderedIds.some((id, i) => id !== originalOrder[i]);
+  const handleClose = (applyChanges: boolean) => {
+    if (applyChanges) {
+      const originalPresets = [...presets].sort((a, b) => a.order - b.order);
+      const originalIds = originalPresets.map((p) => p.id);
+      const currentIds = localPresets.map((p) => p.id);
 
-    if (orderChanged) {
-      onReorder(orderedIds);
+      const deletedIds = originalIds.filter((id) => !currentIds.includes(id));
+      const orderChanged = currentIds.length !== originalIds.length ||
+        currentIds.some((id, i) => id !== originalIds[i]);
+
+      if (deletedIds.length > 0) {
+        onDelete(deletedIds);
+      }
+
+      if (orderChanged) {
+        onReorder(currentIds);
+      }
     }
     onClose();
   };
@@ -60,7 +74,6 @@ export const ManagePresetsModal: React.FC<ManagePresetsModalProps> = ({
   const handleDelete = (id: string) => {
     if (deleteConfirmId === id) {
       setLocalPresets((prev) => prev.filter((p) => p.id !== id));
-      onDelete(id);
       setDeleteConfirmId(null);
     } else {
       setDeleteConfirmId(id);
@@ -70,17 +83,27 @@ export const ManagePresetsModal: React.FC<ManagePresetsModalProps> = ({
     }
   };
 
+  const handleEdit = (preset: FilterPreset) => {
+    onEdit(preset);
+  };
+
   return (
     <Modal
       open={open}
-      onClose={handleClose}
+      onClose={() => handleClose(false)}
+      closeOnOverlayClick={false}
       title="管理筛选方案"
       subtitle="编辑、删除或调整方案顺序"
       size="lg"
       footer={
-        <Button onClick={handleClose}>
-          完成
-        </Button>
+        <>
+          <Button variant="ghost" onClick={() => handleClose(false)}>
+            取消
+          </Button>
+          <Button onClick={() => handleClose(true)}>
+            完成
+          </Button>
+        </>
       }
     >
       {localPresets.length === 0 ? (
@@ -185,7 +208,7 @@ export const ManagePresetsModal: React.FC<ManagePresetsModalProps> = ({
 
               <div className="flex items-center gap-1 shrink-0">
                 <button
-                  onClick={() => onEdit(preset)}
+                  onClick={() => handleEdit(preset)}
                   className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
                   title="编辑"
                 >

@@ -106,9 +106,13 @@ const NoiseLog: React.FC = () => {
     });
   };
 
-  const handleSavePreset = (name: string) => {
+  const handleSavePreset = (name: string, updateFilters: boolean) => {
     if (editingPreset) {
-      updateFilterPreset(editingPreset.id, { name, filters });
+      if (updateFilters) {
+        updateFilterPreset(editingPreset.id, { name, filters });
+      } else {
+        updateFilterPreset(editingPreset.id, { name });
+      }
     } else {
       addFilterPreset(name, filters);
     }
@@ -129,6 +133,10 @@ const NoiseLog: React.FC = () => {
 
   const handleApplyPresetFromManager = (id: string) => {
     applyFilterPreset(id);
+  };
+
+  const handleDeletePresets = (ids: string[]) => {
+    ids.forEach((id) => deleteFilterPreset(id));
   };
 
   const hasActiveFilters =
@@ -536,7 +544,7 @@ const NoiseLog: React.FC = () => {
           setShowSavePresetModal(false);
           setEditingPreset(null);
         }}
-        filters={filters}
+        currentFilters={filters}
         editingPreset={editingPreset}
         onSave={handleSavePreset}
       />
@@ -547,7 +555,7 @@ const NoiseLog: React.FC = () => {
         presets={filterPresets}
         activePresetId={activePresetId}
         onEdit={handleEditPreset}
-        onDelete={deleteFilterPreset}
+        onDelete={handleDeletePresets}
         onReorder={reorderFilterPresets}
         onApply={handleApplyPresetFromManager}
       />
