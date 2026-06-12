@@ -13,7 +13,7 @@ import { format, parseISO } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { useRecordsStore, selectFilteredRecords } from '@/store/useRecordsStore';
-import { noiseTypes, getNoiseTypeConfig } from '@/constants/noiseTypes';
+import { noiseTypes } from '@/constants/noiseTypes';
 import { impactTags, getImpactTagById } from '@/constants/impactTags';
 import { groupRecordsByDate, getDurationText } from '@/utils/dateUtils';
 import { formatNoiseType } from '@/utils/formatUtils';
@@ -21,20 +21,30 @@ import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { RecordTimelineItem } from '@/components/record/RecordTimelineItem';
-import type { NoiseType } from '@/types';
+import { FilterPresetSelector } from '@/components/record/FilterPresetSelector';
+import { SavePresetModal } from '@/components/record/SavePresetModal';
+import { ManagePresetsModal } from '@/components/record/ManagePresetsModal';
+import type { NoiseType, FilterPreset } from '@/types';
 
-/**
- * NoiseLog 噪音日志页面
- * 支持筛选、搜索、分组展示所有噪音记录
- */
 const NoiseLog: React.FC = () => {
   const records = useRecordsStore((s) => s.records);
   const filters = useRecordsStore((s) => s.filters);
+  const filterPresets = useRecordsStore((s) => s.filterPresets);
+  const activePresetId = useRecordsStore((s) => s.activePresetId);
   const setFilters = useRecordsStore((s) => s.setFilters);
   const resetFilters = useRecordsStore((s) => s.resetFilters);
   const openNewForm = useRecordsStore((s) => s.openNewForm);
+  const addFilterPreset = useRecordsStore((s) => s.addFilterPreset);
+  const updateFilterPreset = useRecordsStore((s) => s.updateFilterPreset);
+  const deleteFilterPreset = useRecordsStore((s) => s.deleteFilterPreset);
+  const reorderFilterPresets = useRecordsStore((s) => s.reorderFilterPresets);
+  const applyFilterPreset = useRecordsStore((s) => s.applyFilterPreset);
 
   const [showNoiseTypeDropdown, setShowNoiseTypeDropdown] = React.useState(false);
+  const [showSavePresetModal, setShowSavePresetModal] = React.useState(false);
+  const [showManagePresetsModal, setShowManagePresetsModal] = React.useState(false);
+  const [editingPreset, setEditingPreset] = React.useState<FilterPreset | null>(null);
+
   const dropdownRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
@@ -96,6 +106,31 @@ const NoiseLog: React.FC = () => {
     });
   };
 
+  const handleSavePreset = (name: string) => {
+    if (editingPreset) {
+      updateFilterPreset(editingPreset.id, { name, filters });
+    } else {
+      addFilterPreset(name, filters);
+    }
+    setShowSavePresetModal(false);
+    setEditingPreset(null);
+  };
+
+  const handleOpenSavePreset = () => {
+    setEditingPreset(null);
+    setShowSavePresetModal(true);
+  };
+
+  const handleEditPreset = (preset: FilterPreset) => {
+    setEditingPreset(preset);
+    setShowManagePresetsModal(false);
+    setShowSavePresetModal(true);
+  };
+
+  const handleApplyPresetFromManager = (id: string) => {
+    applyFilterPreset(id);
+  };
+
   const hasActiveFilters =
     filters.keyword.trim() !== '' ||
     filters.dateRange.start !== null ||
@@ -134,6 +169,10 @@ const NoiseLog: React.FC = () => {
             <p className="text-sm text-slate-500 mt-1">
               共 {filteredRecords.length} 条记录
               {hasActiveFilters && ' (已筛选)'}
+              {activePresetId && (() => {
+                const preset = filterPresets.find((p) => p.id === activePresetId);
+                return preset ? ` · 方案: ${preset.name}` : '';
+              })()}
             </p>
           </div>
           <Button icon={<FileText className="w-4 h-4" />} onClick={openNewForm}>
@@ -144,8 +183,18 @@ const NoiseLog: React.FC = () => {
         <Card>
           <CardContent className="py-4">
             <div className="flex flex-col gap-4">
-              <div className="flex flex-col sm:flex-row gap-3">
-                <div className="relative flex-1">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                <FilterPresetSelector
+                  presets={filterPresets}
+                  activePresetId={activePresetId}
+                  onSelectPreset={applyFilterPreset}
+                  onSavePreset={handleOpenSavePreset}
+                  onManagePresets={() => setShowManagePresetsModal(true)}
+                />
+
+                <div className="h-6 w-px bg-slate-200 hidden sm:block" />
+
+                <div className="relative flex-1 min-w-0 sm:min-w-[240px]">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
                     type="text"
@@ -480,6 +529,28 @@ const NoiseLog: React.FC = () => {
           </div>
         )}
       </div>
+
+      <SavePresetModal
+        open={showSavePresetModal}
+        onClose={() => {
+          setShowSavePresetModal(false);
+          setEditingPreset(null);
+        }}
+        filters={filters}
+        editingPreset={editingPreset}
+        onSave={handleSavePreset}
+      />
+
+      <ManagePresetsModal
+        open={showManagePresetsModal}
+        onClose={() => setShowManagePresetsModal(false)}
+        presets={filterPresets}
+        activePresetId={activePresetId}
+        onEdit={handleEditPreset}
+        onDelete={deleteFilterPreset}
+        onReorder={reorderFilterPresets}
+        onApply={handleApplyPresetFromManager}
+      />
     </div>
   );
 };

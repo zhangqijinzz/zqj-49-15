@@ -91,3 +91,23 @@ export interface TimeRangeStats {
   evening: number;    // 傍晚时段（18:00-22:00）记录数
   night: number;      // 夜间时段（22:00-6:00）记录数
 }
+
+// 筛选条件
+export interface Filters {
+  dateRange: {
+    start: string | null;
+    end: string | null;
+  };
+  noiseTypes: NoiseType[];
+  impactTagIds: string[];
+  keyword: string;
+}
+
+// 筛选方案
+export interface FilterPreset {
+  id: string;
+  name: string;
+  filters: Filters;
+  createdAt: string;
+  order: number;
+}

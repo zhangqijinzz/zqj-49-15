@@ -4,60 +4,49 @@
  */
 
 import { create } from 'zustand';
-import type { NoiseRecord, Evidence, NoiseType, ImpactCategory } from '@/types';
+import type {
+  NoiseRecord,
+  Evidence,
+  Filters,
+  FilterPreset,
+} from '@/types';
 import { generateId } from '@/utils/idUtils';
 
-// ==================== 类型定义 ====================
+// ==================== Store 状态类型 ====================
 
-/**
- * 筛选条件类型定义
- */
-export interface Filters {
-  dateRange: {
-    start: string | null;  // 起始日期（YYYY-MM-DD）
-    end: string | null;    // 结束日期（YYYY-MM-DD）
-  };
-  noiseTypes: NoiseType[];        // 选中的噪音类型
-  impactTagIds: string[];         // 选中的影响标签ID
-  keyword: string;                // 搜索关键词
-}
-
-/**
- * Store 状态类型
- */
 export interface RecordsState {
-  // ===== 数据状态 =====
-  records: NoiseRecord[];         // 噪音记录列表
-  evidence: Evidence[];           // 证据材料列表
+  records: NoiseRecord[];
+  evidence: Evidence[];
 
-  // ===== UI 状态 =====
-  isFormModalOpen: boolean;       // 记录表单弹窗是否打开
-  editingRecordId: string | null; // 当前编辑的记录ID（null表示新增）
-  previewEvidenceId: string | null; // 当前预览的证据ID
+  isFormModalOpen: boolean;
+  editingRecordId: string | null;
+  previewEvidenceId: string | null;
 
-  // ===== 筛选状态 =====
   filters: Filters;
+  filterPresets: FilterPreset[];
+  activePresetId: string | null;
 
-  // ===== 记录操作方法 =====
   addRecord: (record: Omit<NoiseRecord, 'id' | 'createdAt' | 'updatedAt'>) => void;
   updateRecord: (id: string, partial: Partial<NoiseRecord>) => void;
   deleteRecord: (id: string) => void;
 
-  // ===== 证据操作方法 =====
   addEvidence: (evidence: Omit<Evidence, 'id' | 'createdAt'>) => void;
   deleteEvidence: (id: string) => void;
 
-  // ===== UI 操作方法 =====
   openNewForm: () => void;
   openEditForm: (id: string) => void;
   closeForm: () => void;
   setPreviewEvidence: (id: string | null) => void;
 
-  // ===== 筛选操作方法 =====
   setFilters: (partial: Partial<Filters>) => void;
   resetFilters: () => void;
 
-  // ===== 持久化方法 =====
+  addFilterPreset: (name: string, filters: Filters) => void;
+  updateFilterPreset: (id: string, data: Partial<Pick<FilterPreset, 'name' | 'filters'>>) => void;
+  deleteFilterPreset: (id: string) => void;
+  reorderFilterPresets: (orderedIds: string[]) => void;
+  applyFilterPreset: (id: string) => void;
+
   hydrateFromStorage: () => void;
 }
 
@@ -65,6 +54,8 @@ export interface RecordsState {
 const STORAGE_KEYS = {
   RECORDS: 'noise_records',
   EVIDENCE: 'noise_evidence',
+  FILTERS: 'noise_filters',
+  FILTER_PRESETS: 'noise_filter_presets',
 } as const;
 
 // ==================== 默认筛选条件 ====================
@@ -80,10 +71,6 @@ const DEFAULT_FILTERS: Filters = {
 
 // ==================== Mock 初始数据 ====================
 
-/**
- * 生成 Mock 噪音记录数据
- * 用于首次使用时展示示例数据
- */
 const generateMockRecords = (): NoiseRecord[] => {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -187,9 +174,6 @@ const generateMockRecords = (): NoiseRecord[] => {
   ];
 };
 
-/**
- * 生成 Mock 证据数据
- */
 const generateMockEvidence = (): Evidence[] => {
   return [
     {
@@ -219,9 +203,6 @@ const generateMockEvidence = (): Evidence[] => {
 
 // ==================== 持久化辅助方法 ====================
 
-/**
- * 保存记录到 LocalStorage
- */
 const persistRecords = (records: NoiseRecord[]) => {
   try {
     localStorage.setItem(STORAGE_KEYS.RECORDS, JSON.stringify(records));
@@ -230,9 +211,6 @@ const persistRecords = (records: NoiseRecord[]) => {
   }
 };
 
-/**
- * 保存证据到 LocalStorage
- */
 const persistEvidence = (evidence: Evidence[]) => {
   try {
     localStorage.setItem(STORAGE_KEYS.EVIDENCE, JSON.stringify(evidence));
@@ -241,9 +219,22 @@ const persistEvidence = (evidence: Evidence[]) => {
   }
 };
 
-/**
- * 从 LocalStorage 加载记录
- */
+const persistFilters = (filters: Filters) => {
+  try {
+    localStorage.setItem(STORAGE_KEYS.FILTERS, JSON.stringify(filters));
+  } catch (e) {
+    console.error('保存筛选条件失败:', e);
+  }
+};
+
+const persistFilterPresets = (presets: FilterPreset[]) => {
+  try {
+    localStorage.setItem(STORAGE_KEYS.FILTER_PRESETS, JSON.stringify(presets));
+  } catch (e) {
+    console.error('保存筛选方案失败:', e);
+  }
+};
+
 const loadRecords = (): NoiseRecord[] | null => {
   try {
     const data = localStorage.getItem(STORAGE_KEYS.RECORDS);
@@ -256,9 +247,6 @@ const loadRecords = (): NoiseRecord[] | null => {
   return null;
 };
 
-/**
- * 从 LocalStorage 加载证据
- */
 const loadEvidence = (): Evidence[] | null => {
   try {
     const data = localStorage.getItem(STORAGE_KEYS.EVIDENCE);
@@ -271,18 +259,59 @@ const loadEvidence = (): Evidence[] | null => {
   return null;
 };
 
+const loadFilters = (): Filters | null => {
+  try {
+    const data = localStorage.getItem(STORAGE_KEYS.FILTERS);
+    if (data) {
+      const parsed = JSON.parse(data);
+      return {
+        ...DEFAULT_FILTERS,
+        ...parsed,
+        dateRange: {
+          ...DEFAULT_FILTERS.dateRange,
+          ...(parsed.dateRange ?? {}),
+        },
+      };
+    }
+  } catch (e) {
+    console.error('加载筛选条件失败:', e);
+  }
+  return null;
+};
+
+const loadFilterPresets = (): FilterPreset[] => {
+  try {
+    const data = localStorage.getItem(STORAGE_KEYS.FILTER_PRESETS);
+    if (data) {
+      return JSON.parse(data) as FilterPreset[];
+    }
+  } catch (e) {
+    console.error('加载筛选方案失败:', e);
+  }
+  return [];
+};
+
+// ==================== 深拷贝辅助方法 ====================
+const deepCloneFilters = (filters: Filters): Filters => {
+  return {
+    ...filters,
+    dateRange: { ...filters.dateRange },
+    noiseTypes: [...filters.noiseTypes],
+    impactTagIds: [...filters.impactTagIds],
+  };
+};
+
 // ==================== 创建 Store ====================
 
 export const useRecordsStore = create<RecordsState>((set, get) => ({
-  // ===== 初始数据 =====
   records: generateMockRecords(),
   evidence: generateMockEvidence(),
   isFormModalOpen: false,
   editingRecordId: null,
   previewEvidenceId: null,
   filters: { ...DEFAULT_FILTERS },
-
-  // ===== 记录操作 =====
+  filterPresets: [],
+  activePresetId: null,
 
   addRecord: (recordData) => {
     const now = new Date().toISOString();
@@ -309,7 +338,6 @@ export const useRecordsStore = create<RecordsState>((set, get) => ({
 
   deleteRecord: (id) => {
     const state = get();
-    // 删除记录时，同时删除关联的证据
     const targetRecord = state.records.find((r) => r.id === id);
     const evidenceIdsToDelete = targetRecord?.evidenceIds ?? [];
 
@@ -323,8 +351,6 @@ export const useRecordsStore = create<RecordsState>((set, get) => ({
     persistEvidence(newEvidence);
   },
 
-  // ===== 证据操作 =====
-
   addEvidence: (evidenceData) => {
     const newEvidenceItem: Evidence = {
       ...evidenceData,
@@ -333,7 +359,6 @@ export const useRecordsStore = create<RecordsState>((set, get) => ({
     };
     const newEvidence = [newEvidenceItem, ...get().evidence];
 
-    // 同时更新关联记录的 evidenceIds
     const newRecords = get().records.map((record) =>
       record.id === evidenceData.recordId
         ? {
@@ -356,7 +381,6 @@ export const useRecordsStore = create<RecordsState>((set, get) => ({
 
     const newEvidence = state.evidence.filter((e) => e.id !== id);
 
-    // 同时从关联记录中移除 evidenceId
     const newRecords = state.records.map((record) =>
       record.id === targetEvidence.recordId
         ? {
@@ -371,8 +395,6 @@ export const useRecordsStore = create<RecordsState>((set, get) => ({
     persistEvidence(newEvidence);
     persistRecords(newRecords);
   },
-
-  // ===== UI 操作 =====
 
   openNewForm: () => {
     set({
@@ -399,36 +421,107 @@ export const useRecordsStore = create<RecordsState>((set, get) => ({
     set({ previewEvidenceId: id });
   },
 
-  // ===== 筛选操作 =====
-
   setFilters: (partial) => {
-    set((state) => ({
-      filters: {
+    set((state) => {
+      const newFilters = {
         ...state.filters,
         ...partial,
         dateRange: {
           ...state.filters.dateRange,
           ...(partial.dateRange ?? {}),
         },
-      },
-    }));
+      };
+      persistFilters(newFilters);
+      return {
+        filters: newFilters,
+        activePresetId: null,
+      };
+    });
   },
 
   resetFilters: () => {
-    set({ filters: { ...DEFAULT_FILTERS } });
+    set({ filters: { ...DEFAULT_FILTERS }, activePresetId: null });
+    persistFilters(DEFAULT_FILTERS);
   },
 
-  // ===== 持久化：从 localStorage 加载 =====
+  addFilterPreset: (name, filters) => {
+    const state = get();
+    const newPreset: FilterPreset = {
+      id: generateId(),
+      name,
+      filters: deepCloneFilters(filters),
+      createdAt: new Date().toISOString(),
+      order: state.filterPresets.length,
+    };
+    const newPresets = [...state.filterPresets, newPreset];
+    set({ filterPresets: newPresets });
+    persistFilterPresets(newPresets);
+  },
+
+  updateFilterPreset: (id, data) => {
+    const state = get();
+    const newPresets = state.filterPresets.map((preset) =>
+      preset.id === id
+        ? {
+            ...preset,
+            ...(data.name ? { name: data.name } : {}),
+            ...(data.filters ? { filters: deepCloneFilters(data.filters) } : {}),
+          }
+        : preset
+    );
+    set({ filterPresets: newPresets });
+    persistFilterPresets(newPresets);
+  },
+
+  deleteFilterPreset: (id) => {
+    const state = get();
+    const newPresets = state.filterPresets.filter((p) => p.id !== id);
+    set({
+      filterPresets: newPresets,
+      activePresetId: state.activePresetId === id ? null : state.activePresetId,
+    });
+    persistFilterPresets(newPresets);
+  },
+
+  reorderFilterPresets: (orderedIds) => {
+    const state = get();
+    const idToPreset = new Map(state.filterPresets.map((p) => [p.id, p]));
+    const newPresets = orderedIds
+      .map((id, index) => {
+        const preset = idToPreset.get(id);
+        return preset ? { ...preset, order: index } : null;
+      })
+      .filter((p): p is FilterPreset => p !== null);
+
+    state.filterPresets.forEach((p) => {
+      if (!orderedIds.includes(p.id)) {
+        newPresets.push({ ...p, order: newPresets.length });
+      }
+    });
+
+    set({ filterPresets: newPresets });
+    persistFilterPresets(newPresets);
+  },
+
+  applyFilterPreset: (id) => {
+    const state = get();
+    const preset = state.filterPresets.find((p) => p.id === id);
+    if (preset) {
+      const newFilters = deepCloneFilters(preset.filters);
+      set({ filters: newFilters, activePresetId: id });
+      persistFilters(newFilters);
+    }
+  },
 
   hydrateFromStorage: () => {
     const storedRecords = loadRecords();
     const storedEvidence = loadEvidence();
+    const storedFilters = loadFilters();
+    const storedPresets = loadFilterPresets();
 
-    // 仅当存储中有数据时才覆盖（避免覆盖首次加载的 mock 数据）
     if (storedRecords && storedRecords.length > 0) {
       set({ records: storedRecords });
     } else {
-      // 如果存储为空，使用 mock 数据并持久化
       persistRecords(get().records);
     }
 
@@ -437,34 +530,32 @@ export const useRecordsStore = create<RecordsState>((set, get) => ({
     } else {
       persistEvidence(get().evidence);
     }
+
+    if (storedFilters) {
+      set({ filters: storedFilters });
+    } else {
+      persistFilters(get().filters);
+    }
+
+    set({ filterPresets: storedPresets });
   },
 }));
 
 // ==================== 辅助选择器 ====================
 
-/**
- * 根据 ID 获取记录
- */
 export const selectRecordById = (id: string): NoiseRecord | undefined => {
   return useRecordsStore.getState().records.find((r) => r.id === id);
 };
 
-/**
- * 根据记录 ID 获取关联的证据列表
- */
 export const selectEvidenceByRecordId = (recordId: string): Evidence[] => {
   return useRecordsStore.getState().evidence.filter((e) => e.recordId === recordId);
 };
 
-/**
- * 获取筛选后的记录（纯函数版本，供外部使用）
- */
 export const selectFilteredRecords = (
   records: NoiseRecord[],
   filters: Filters
 ): NoiseRecord[] => {
   return records.filter((record) => {
-    // 日期范围筛选
     if (filters.dateRange.start && record.date < filters.dateRange.start) {
       return false;
     }
@@ -472,12 +563,10 @@ export const selectFilteredRecords = (
       return false;
     }
 
-    // 噪音类型筛选
     if (filters.noiseTypes.length > 0 && !filters.noiseTypes.includes(record.noiseType)) {
       return false;
     }
 
-    // 影响标签筛选（只要有任意一个标签匹配即通过）
     if (
       filters.impactTagIds.length > 0 &&
       !record.impactTagIds.some((id) => filters.impactTagIds.includes(id))
@@ -485,7 +574,6 @@ export const selectFilteredRecords = (
       return false;
     }
 
-    // 关键词筛选（搜索标题和描述）
     if (filters.keyword.trim()) {
       const keyword = filters.keyword.trim().toLowerCase();
       const inTitle = record.title.toLowerCase().includes(keyword);
